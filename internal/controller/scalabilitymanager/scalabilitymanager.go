@@ -1,5 +1,5 @@
 /*
-Copyright 2020 The Crossplane Authors.
+Copyright 2022 The Crossplane Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package mytype
+package scalabilitymanager
 
 import (
 	"context"
@@ -28,20 +28,21 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/connection"
 	"github.com/crossplane/crossplane-runtime/pkg/controller"
 	"github.com/crossplane/crossplane-runtime/pkg/event"
+	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	"github.com/crossplane/crossplane-runtime/pkg/ratelimiter"
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 
-	"github.com/crossplane/provider-template/apis/sample/v1alpha1"
-	apisv1alpha1 "github.com/crossplane/provider-template/apis/v1alpha1"
-	"github.com/crossplane/provider-template/internal/features"
+	"github.com/crossplane/provider-scalabilityprovider/apis/scalability/v1alpha1"
+	apisv1alpha1 "github.com/crossplane/provider-scalabilityprovider/apis/v1alpha1"
+	"github.com/crossplane/provider-scalabilityprovider/internal/features"
 )
 
 const (
-	errNotMyType    = "managed resource is not a MyType custom resource"
-	errTrackPCUsage = "cannot track ProviderConfig usage"
-	errGetPC        = "cannot get ProviderConfig"
-	errGetCreds     = "cannot get credentials"
+	errNotScalabilityManager = "managed resource is not a ScalabilityManager custom resource"
+	errTrackPCUsage          = "cannot track ProviderConfig usage"
+	errGetPC                 = "cannot get ProviderConfig"
+	errGetCreds              = "cannot get credentials"
 
 	errNewClient = "cannot create new Service"
 )
@@ -53,43 +54,39 @@ var (
 	newNoOpService = func(_ []byte) (interface{}, error) { return &NoOpService{}, nil }
 )
 
-// Setup adds a controller that reconciles MyType managed resources.
+// Setup adds a controller that reconciles ScalabilityManager managed resources.
 func Setup(mgr ctrl.Manager, o controller.Options) error {
-	name := managed.ControllerName(v1alpha1.MyTypeGroupKind)
+	name := managed.ControllerName(v1alpha1.ScalabilityManagerGroupKind)
 
 	cps := []managed.ConnectionPublisher{managed.NewAPISecretPublisher(mgr.GetClient(), mgr.GetScheme())}
 	if o.Features.Enabled(features.EnableAlphaExternalSecretStores) {
 		cps = append(cps, connection.NewDetailsManager(mgr.GetClient(), apisv1alpha1.StoreConfigGroupVersionKind))
 	}
 
-	opts := []managed.ReconcilerOption{
+	r := managed.NewReconciler(mgr,
+		resource.ManagedKind(v1alpha1.ScalabilityManagerGroupVersionKind),
 		managed.WithExternalConnecter(&connector{
 			kube:         mgr.GetClient(),
 			usage:        resource.NewProviderConfigUsageTracker(mgr.GetClient(), &apisv1alpha1.ProviderConfigUsage{}),
-			newServiceFn: newNoOpService}),
+			newServiceFn: newNoOpService,
+			logger:       o.Logger}),
 		managed.WithLogger(o.Logger.WithValues("controller", name)),
 		managed.WithPollInterval(o.PollInterval),
 		managed.WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorderFor(name))),
-		managed.WithConnectionPublishers(cps...),
-	}
-
-	if o.Features.Enabled(features.EnableAlphaManagementPolicies) {
-		opts = append(opts, managed.WithManagementPolicies())
-	}
-
-	r := managed.NewReconciler(mgr, resource.ManagedKind(v1alpha1.MyTypeGroupVersionKind), opts...)
+		managed.WithConnectionPublishers(cps...))
 
 	return ctrl.NewControllerManagedBy(mgr).
 		Named(name).
 		WithOptions(o.ForControllerRuntime()).
 		WithEventFilter(resource.DesiredStateChanged()).
-		For(&v1alpha1.MyType{}).
+		For(&v1alpha1.ScalabilityManager{}).
 		Complete(ratelimiter.NewReconciler(name, r, o.GlobalRateLimiter))
 }
 
 // A connector is expected to produce an ExternalClient when its Connect method
 // is called.
 type connector struct {
+	logger       logging.Logger
 	kube         client.Client
 	usage        resource.Tracker
 	newServiceFn func(creds []byte) (interface{}, error)
@@ -101,9 +98,9 @@ type connector struct {
 // 3. Getting the credentials specified by the ProviderConfig.
 // 4. Using the credentials to form a client.
 func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.ExternalClient, error) {
-	cr, ok := mg.(*v1alpha1.MyType)
+	cr, ok := mg.(*v1alpha1.ScalabilityManager)
 	if !ok {
-		return nil, errors.New(errNotMyType)
+		return nil, errors.New(errNotScalabilityManager)
 	}
 
 	if err := c.usage.Track(ctx, mg); err != nil {
@@ -126,7 +123,7 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		return nil, errors.Wrap(err, errNewClient)
 	}
 
-	return &external{service: svc}, nil
+	return &external{service: svc, logger: c.logger}, nil
 }
 
 // An ExternalClient observes, then either creates, updates, or deletes an
@@ -135,27 +132,34 @@ type external struct {
 	// A 'client' used to connect to the external resource API. In practice this
 	// would be something like an AWS SDK client.
 	service interface{}
+	logger  logging.Logger
 }
 
 func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
-	cr, ok := mg.(*v1alpha1.MyType)
+	_, ok := mg.(*v1alpha1.ScalabilityManager)
 	if !ok {
-		return managed.ExternalObservation{}, errors.New(errNotMyType)
+		return managed.ExternalObservation{}, errors.New(errNotScalabilityManager)
 	}
 
-	// These fmt statements should be removed in the real implementation.
-	fmt.Printf("Observing: %+v", cr)
+	active, queueState, err := ObserveBroker("example-3", c.logger)
+	if err != nil {
+		c.logger.Debug("ERRORE OSSERVAZIONE BROKER")
+		c.logger.Debug(err.Error())
+		active = false
+	}
+
+	c.logger.Debug(string(queueState))
 
 	return managed.ExternalObservation{
 		// Return false when the external resource does not exist. This lets
 		// the managed resource reconciler know that it needs to call Create to
 		// (re)create the resource, or that it has successfully been deleted.
-		ResourceExists: true,
+		ResourceExists: active,
 
 		// Return false when the external resource exists, but it not up to date
 		// with the desired managed resource state. This lets the managed
 		// resource reconciler know that it needs to call Update.
-		ResourceUpToDate: true,
+		ResourceUpToDate: queueState < 500,
 
 		// Return any details that may be required to connect to the external
 		// resource. These will be stored as the connection secret.
@@ -164,9 +168,9 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 }
 
 func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.ExternalCreation, error) {
-	cr, ok := mg.(*v1alpha1.MyType)
+	cr, ok := mg.(*v1alpha1.ScalabilityManager)
 	if !ok {
-		return managed.ExternalCreation{}, errors.New(errNotMyType)
+		return managed.ExternalCreation{}, errors.New(errNotScalabilityManager)
 	}
 
 	fmt.Printf("Creating: %+v", cr)
@@ -179,12 +183,15 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 }
 
 func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.ExternalUpdate, error) {
-	cr, ok := mg.(*v1alpha1.MyType)
+	cr, ok := mg.(*v1alpha1.ScalabilityManager)
 	if !ok {
-		return managed.ExternalUpdate{}, errors.New(errNotMyType)
+		return managed.ExternalUpdate{}, errors.New(errNotScalabilityManager)
 	}
 
+	c.logger.Debug("CHIAMATO UPDATE PERCHé LA CODA é MOLTO LUNGA")
 	fmt.Printf("Updating: %+v", cr)
+
+	num_processi, active, err := ObserveBroker("example-3", c.logger)
 
 	return managed.ExternalUpdate{
 		// Optionally return any details that may be required to connect to the
@@ -194,9 +201,9 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 }
 
 func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
-	cr, ok := mg.(*v1alpha1.MyType)
+	cr, ok := mg.(*v1alpha1.ScalabilityManager)
 	if !ok {
-		return errors.New(errNotMyType)
+		return errors.New(errNotScalabilityManager)
 	}
 
 	fmt.Printf("Deleting: %+v", cr)

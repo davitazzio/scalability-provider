@@ -4,18 +4,18 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.12.1
-  name: mytypes.sample.template.crossplane.io
+  name: scalabilitymanagers.scalability.scalabilityprovider.crossplane.io
 spec:
-  group: sample.template.crossplane.io
+  group: scalability.scalabilityprovider.crossplane.io
   names:
     categories:
     - crossplane
     - managed
-    - template
-    kind: MyType
-    listKind: MyTypeList
-    plural: mytypes
-    singular: mytype
+    - scalabilityprovider
+    kind: ScalabilityManager
+    listKind: ScalabilityManagerList
+    plural: scalabilitymanagers
+    singular: scalabilitymanager
   scope: Cluster
   versions:
   - additionalPrinterColumns:
@@ -34,7 +34,7 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: A MyType is an example API type.
+        description: A ScalabilityManager is an example API type.
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -49,7 +49,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: A MyTypeSpec defines the desired state of a MyType.
+            description: A ScalabilityManagerSpec defines the desired state of a ScalabilityManager.
             properties:
               deletionPolicy:
                 default: Delete
@@ -65,12 +65,13 @@ spec:
                 - Delete
                 type: string
               forProvider:
-                description: MyTypeParameters are the configurable fields of a MyType.
+                description: ScalabilityManagerParameters are the configurable fields
+                  of a ScalabilityManager.
                 properties:
-                  configurableField:
+                  trashold:
                     type: string
                 required:
-                - configurableField
+                - trashold
                 type: object
               managementPolicies:
                 default:
@@ -270,17 +271,15 @@ spec:
             - forProvider
             type: object
           status:
-            description: A MyTypeStatus represents the observed state of a MyType.
+            description: A ScalabilityManagerStatus represents the observed state
+              of a ScalabilityManager.
             properties:
               atProvider:
-                description: MyTypeObservation are the observable fields of a MyType.
+                description: ScalabilityManagerObservation are the observable fields
+                  of a ScalabilityManager.
                 properties:
-                  configurableField:
+                  numberOfProcesses:
                     type: string
-                  observableField:
-                    type: string
-                required:
-                - configurableField
                 type: object
               conditions:
                 description: Conditions of the resource.
