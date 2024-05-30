@@ -99,6 +99,8 @@ spec:
                   - '*'
                   type: string
                 type: array
+              numConsumerDesired:
+                type: integer
               providerConfigRef:
                 default:
                   name: default
@@ -274,6 +276,10 @@ spec:
             description: A ScalabilityManagerStatus represents the observed state
               of a ScalabilityManager.
             properties:
+              Consumers:
+                items:
+                  type: string
+                type: array
               atProvider:
                 description: ScalabilityManagerObservation are the observable fields
                   of a ScalabilityManager.

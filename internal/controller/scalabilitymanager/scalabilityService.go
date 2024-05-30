@@ -174,3 +174,121 @@ func CreateNewProcess(address string, nodeport string, remoteuser string, progra
 	}
 
 }
+
+func CreateNewProcessConsumer(address string, nodeport string, remoteuser string, name string, logger logging.Logger) (bool, error) {
+
+	config, err := clientcmd.BuildConfigFromFlags("", "")
+	if err != nil {
+		return false, err
+	}
+	clientset, err := dynamic.NewForConfig(config)
+	if err != nil {
+		return false, err
+	}
+
+	obj := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "process.processprovider.crossplane.io/v1alpha1",
+			"kind":       "Process",
+			"metadata": map[string]interface{}{
+				"name": name,
+			},
+			"spec": map[string]interface{}{
+				"forProvider": map[string]interface{}{
+					"nodeAddress": address,
+					"nodePort":    nodeport,
+					"remoteUser":  remoteuser,
+				},
+				"providerConfigRef": map[string]interface{}{
+					"name": "processprovider-config",
+				},
+			},
+		},
+	}
+
+	result, err := clientset.Resource(schema.GroupVersionResource{
+		Group:    "process.processprovider.crossplane.io",
+		Version:  "v1alpha1",
+		Resource: "processes",
+	}).Create(context.TODO(), obj, metav1.CreateOptions{})
+
+	if err != nil {
+		logger.Debug(fmt.Sprintf("Error creating custom resource: %v", err))
+		return false, err
+	} else {
+		logger.Debug(fmt.Sprintf("Custom resource created successfully ", result))
+		return true, nil
+	}
+
+}
+
+// func CreateClusterRoleBinding(logger logging.Logger) (bool, error) {
+// 	/*
+// 		apiVersion: rbac.authorization.k8s.io/v1
+// 		kind: ClusterRoleBinding
+// 		metadata:
+// 			labels:
+// 				app.kubernetes.io/component: exporter
+// 				app.kubernetes.io/name: kube-state-metrics
+// 				app.kubernetes.io/version: 2.12.0
+// 			name: kube-state-metrics
+// 		roleRef:
+// 			apiGroup: rbac.authorization.k8s.io
+// 			kind: ClusterRole
+// 			name: kube-state-metrics
+// 		subjects:
+// 			- kind: ServiceAccount
+// 			name: kube-state-metrics
+// 			namespace: kube-system
+// 	*/
+
+// 	obj := &unstructured.Unstructured{
+// 		Object: map[string]interface{}{
+// 			"apiVersion": "rbac.authorization.k8s.io/v1",
+// 			"kind":       "ClusterRoleBinding",
+// 			"metadata": map[string]interface{}{
+
+// 				"labels": map[string]interface{}{
+// 					"app.kubernetes.io/component": "exporter",
+// 					"app.kubernetes.io/name":      "kube-state-metrics",
+// 					"app.kubernetes.io/version":   "2.12.0",
+// 				},
+// 				"name": "prova",
+// 			},
+
+// 			"roleRef": map[string]interface{}{
+// 				"apiGroup": "rbac.authorization.k8s.io",
+// 				"kind":     "ClusterRole",
+// 				"name":     "cluster-admin",
+// 			},
+// 			"subjects": map[string]interface{}{
+// 				"kind":      "ServiceAccount",
+// 				"name":      "scalability-provider-account",
+// 				"namespace": "crossplane-system",
+// 			},
+// 		},
+// 	}
+// 	config, err := clientcmd.BuildConfigFromFlags("", "")
+// 	if err != nil {
+// 		return false, err
+// 	}
+// 	clientset, err := dynamic.NewForConfig(config)
+// 	if err != nil {
+// 		return false, err
+// 	}
+
+// 	result, err := clientset.Resource(schema.GroupVersionResource{
+// 		Group:    "rbac.authorization.k8s.io",
+// 		Version:  "v1",
+// 		Resource: "rolebindings",
+// 	}).Create(context.TODO(), obj, metav1.CreateOptions{})
+
+// 	if err != nil {
+// 		logger.Debug(fmt.Sprintf("Error creating custom resource: %v", err))
+// 		return false, err
+// 	} else {
+// 		logger.Debug(fmt.Sprintf("Custom resource created successfully ", result))
+// 		return true, nil
+// 	}
+
+// }

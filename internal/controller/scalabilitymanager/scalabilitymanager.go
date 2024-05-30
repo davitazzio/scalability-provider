@@ -136,7 +136,7 @@ type external struct {
 }
 
 func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
-	_, ok := mg.(*v1alpha1.ScalabilityManager)
+	cr, ok := mg.(*v1alpha1.ScalabilityManager)
 	if !ok {
 		return managed.ExternalObservation{}, errors.New(errNotScalabilityManager)
 	}
@@ -148,7 +148,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		active = false
 	}
 
-	c.logger.Debug(string(queueState))
+	c.logger.Debug(fmt.Sprintf("%d", queueState))
 
 	return managed.ExternalObservation{
 		// Return false when the external resource does not exist. This lets
@@ -159,7 +159,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		// Return false when the external resource exists, but it not up to date
 		// with the desired managed resource state. This lets the managed
 		// resource reconciler know that it needs to call Update.
-		ResourceUpToDate: queueState < 500,
+		ResourceUpToDate: cr.Spec.NumConsumerDesired != len(*cr.Status.Consumers),
 
 		// Return any details that may be required to connect to the external
 		// resource. These will be stored as the connection secret.
@@ -172,6 +172,8 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	if !ok {
 		return managed.ExternalCreation{}, errors.New(errNotScalabilityManager)
 	}
+
+	CreateNewBroker("dtazzioli-processprovider2.cloudmmwunibo.it", "mqtt-broker-example", "dtazzioli", "example", c.logger)
 
 	fmt.Printf("Creating: %+v", cr)
 
@@ -188,10 +190,13 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalUpdate{}, errors.New(errNotScalabilityManager)
 	}
 
+	processConsumerName := fmt.Sprintf("consumer-%d", len(*cr.Status.Consumers))
+
+	CreateNewProcessConsumer("dtazzioli-processprovider.cloudmmwunibo.it", "ciao", "dtazzioli", processConsumerName, c.logger)
+	*cr.Status.Consumers = append(*cr.Status.Consumers, processConsumerName)
+
 	c.logger.Debug("CHIAMATO UPDATE PERCHé LA CODA é MOLTO LUNGA")
 	fmt.Printf("Updating: %+v", cr)
-
-	num_processi, active, err := ObserveBroker("example-3", c.logger)
 
 	return managed.ExternalUpdate{
 		// Optionally return any details that may be required to connect to the

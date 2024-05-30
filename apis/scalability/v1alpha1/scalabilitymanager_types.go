@@ -37,13 +37,15 @@ type ScalabilityManagerObservation struct {
 
 // A ScalabilityManagerSpec defines the desired state of a ScalabilityManager.
 type ScalabilityManagerSpec struct {
-	xpv1.ResourceSpec `json:",inline"`
-	ForProvider       ScalabilityManagerParameters `json:"forProvider"`
+	xpv1.ResourceSpec  `json:",inline"`
+	NumConsumerDesired int                          `json:"numConsumerDesired,omitempty"`
+	ForProvider        ScalabilityManagerParameters `json:"forProvider"`
 }
 
 // A ScalabilityManagerStatus represents the observed state of a ScalabilityManager.
 type ScalabilityManagerStatus struct {
 	xpv1.ResourceStatus `json:",inline"`
+	Consumers           *[]string                     `json:"Consumers,omitempty"`
 	AtProvider          ScalabilityManagerObservation `json:"atProvider,omitempty"`
 }
 

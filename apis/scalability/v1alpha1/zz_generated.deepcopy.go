@@ -135,6 +135,15 @@ func (in *ScalabilityManagerSpec) DeepCopy() *ScalabilityManagerSpec {
 func (in *ScalabilityManagerStatus) DeepCopyInto(out *ScalabilityManagerStatus) {
 	*out = *in
 	in.ResourceStatus.DeepCopyInto(&out.ResourceStatus)
+	if in.Consumers != nil {
+		in, out := &in.Consumers, &out.Consumers
+		*out = new([]string)
+		if **in != nil {
+			in, out := *in, *out
+			*out = make([]string, len(*in))
+			copy(*out, *in)
+		}
+	}
 	out.AtProvider = in.AtProvider
 }
 
